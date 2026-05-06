@@ -38,14 +38,14 @@ Raw and cleaned layers are partitioned by `unit/year/month/date.parquet`. All wr
 preflight → raw_data → cleaned_data → kpi_results
 ```
 
-Each stage is a Dagster asset. Dependencies are declared explicitly — Dagster enforces execution order and blocks downstream assets on failure.
+Each stage is a Dagster asset. Dependencies are declared explicitly. Dagster enforces execution order and blocks downstream assets on failure.
 
 | Stage | What it does |
 |---|---|
 | `preflight` | Checks env vars, directory permissions, API auth, UUID reachability |
-| `raw_data` | Fetches sensor data from REST API → raw Parquet |
-| `cleaned_data` | Parses timestamps, assigns phase labels and cycle IDs → cleaned Parquet |
-| `kpi_results` | Calculates per-cycle KPIs → DuckDB |
+| `raw_data` | Fetches sensor data from REST API --> raw Parquet |
+| `cleaned_data` | Parses timestamps, assigns phase labels and cycle IDs --> cleaned Parquet |
+| `kpi_results` | Calculates per-cycle KPIs --> DuckDB |
 
 ---
 
@@ -59,7 +59,7 @@ The pipeline runs on a weekly cron schedule via Dagster's scheduler. Dagster run
 - Cleaned files contain required derived columns
 - At least one process cycle was detected
 
-**Performance monitoring** — each asset logs elapsed time and memory usage (RSS delta) via `psutil` to the Dagster run log. Run history is queryable via the UI for performance comparison across code changes.
+**Performance monitoring**: each asset logs elapsed time and memory usage (RSS delta) via `psutil` to the Dagster run log. Run history is queryable via the UI for performance comparison across code changes.
 
 ---
 
@@ -72,13 +72,13 @@ Every failure mode raises explicitly. Failures are collected and reported togeth
 - **Clean**: raw file not found, read/write errors, cycle summary not written
 - **KPI**: cycle summary missing or empty, DuckDB not written
 
-Unexpected schema columns are logged to a drift log and dropped rather than failing — the pipeline degrades gracefully on new sensors but fails hard on missing ones.
+Unexpected schema columns are logged to a drift log and dropped rather than failing, so the pipeline degrades gracefully on new sensors but fails hard on missing ones.
 
 ---
 
 ## Parallelisation
 
-The fetch stage submits all unit/date combinations concurrently via `ThreadPoolExecutor`. This is implemented in the underlying `fetch_all()` function and called from the Dagster asset. The clean and KPI stages are sequential — Polars operations are internally vectorised and the bottleneck is I/O.
+The fetch stage submits all unit/date combinations concurrently via `ThreadPoolExecutor`. This is implemented in the underlying `fetch_all()` function and called from the Dagster asset. The clean and KPI stages are sequential. Polars operations are internally vectorised and the bottleneck is I/O.
 
 ---
 
@@ -94,7 +94,7 @@ The physical process runs in discrete cycles, each consisting of six sequential 
 
 ## CI
 
-GitHub Actions runs the full test suite on every push. The workflow installs dependencies via `uv`, generates synthetic test data, and runs pytest. Environment variables required by the config are injected as dummy values in the workflow — the test suite mocks all HTTP calls and uses local synthetic data only.
+GitHub Actions runs the full test suite on every push. The workflow installs dependencies via `uv`, generates synthetic test data, and runs pytest. Environment variables required by the config are injected as dummy values in the workflow. The test suite mocks all HTTP calls and uses local synthetic data only.
 
 ---
 
@@ -106,8 +106,8 @@ GitHub Actions runs the full test suite on every push. The workflow installs dep
 
 ## Key design decisions
 
-- **Single config** — all paths, schemas, phase ranges, and column groupings defined in one place. Nothing else in the codebase hardcodes these.
-- **Atomic writes** — all Parquet files written to `.tmp` first, then renamed. Safe on Windows.
-- **Schema validation at ingest** — unexpected columns logged and dropped; missing expected columns cause a hard failure before any file is written.
-- **`cycle_summary.parquet`** — a single flat manifest of all detected cycles with their status (`complete` / `incomplete` / `error`). Used by the KPI stage to filter and by the orchestrator to detect what needs processing.
-- **Dagster over custom orchestrator** — replaced a hand-rolled `run_all.py` + Task Scheduler setup. Gained scheduling reliability, run history, asset-level failure isolation, and data quality checks with minimal added complexity.
+- **Single config**: all paths, schemas, phase ranges, and column groupings defined in one place. Nothing else in the codebase hardcodes these.
+- **Atomic writes**: all Parquet files written to `.tmp` first, then renamed. Safe on Windows.
+- **Schema validation at ingest**: unexpected columns logged and dropped; missing expected columns cause a hard failure before any file is written.
+- **`cycle_summary.parquet`**: a single flat manifest of all detected cycles with their status (`complete` / `incomplete` / `error`). Used by the KPI stage to filter and by the orchestrator to detect what needs processing.
+- **Dagster over custom orchestrator**: replaced a hand-rolled `run_all.py` + Task Scheduler setup. Gained scheduling reliability, run history, asset-level failure isolation, and data quality checks with minimal added complexity.
